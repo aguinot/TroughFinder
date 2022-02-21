@@ -7,7 +7,7 @@ import healpy as hp
 
 from scipy.spatial import cKDTree, SphericalVoronoi
 
-from healpy_utils import bin_map
+from .healpy_utils import bin_map
 
 
 class VoronoiDensityField():

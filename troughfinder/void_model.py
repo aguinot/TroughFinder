@@ -138,7 +138,7 @@ class CosmicVoidModel():
         else:
             return f_nu/self._volume_sphere(RL)*np.abs(Dln_SigmaR)
 
-    def f_nu(SS, del_v=-0.795, del_c=1.686):
+    def f_nu(self, SS, del_v=-0.795, del_c=1.686):
         r"""f_nu
 
         Fraction of the Univers occupied by cosmic voids (approximation).\n
@@ -228,7 +228,7 @@ class CosmicVoidModel():
 
         return self.cosmo.sigmaR(R, self._z_to_a(z))**2
 
-    def deltav_L(deltav_NL, b_eff, slope=0.854, offset=0.420):
+    def deltav_L(self, deltav_NL, b_eff, slope=0.854, offset=0.420):
         """deltav linear
 
         Linear negative denisty threshold.
@@ -257,7 +257,7 @@ class CosmicVoidModel():
             offset = 1
         return 1.594*(1.-(1+deltav_NL/(slope*b_eff+offset))**(-1./1.594))
 
-    def r_rL(deltav_L):
+    def r_rL(self, deltav_L):
         """
 
         Expansion factor.
