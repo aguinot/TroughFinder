@@ -55,9 +55,12 @@ class VoronoiDensityField():
         pairs = tree.query_pairs(self._pair_thresh)
         pairs = np.array(list(pairs))
         mask_duplicate = np.ones_like(self._ra, dtype=bool)
-        mask_duplicate[pairs[:, 1]] = False
+        if len(pairs) != 0:
+            mask_duplicate[pairs[:, 1]] = False
 
         self._cart_point = self._cart_point[mask_duplicate]
+        self._ra = self._ra[mask_duplicate]
+        self._dec = self._dec[mask_duplicate]
 
         self._verboseprint(
             "Removed objects during pre-check: ", pairs.shape[0]
@@ -132,7 +135,7 @@ class VoronoiDensityField():
             self._ra,
             self._dec,
             nside,
-            weights=1/median_voro_area,
+            weights=1./self.voronoi_area,
             method='average',
         )
 

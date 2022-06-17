@@ -141,7 +141,7 @@ def smooth_map(hp_map, sigma, kind='LogGauss'):
         smooth_map = 10**(gauss_log_map)
         # We set back masked pixels to 0
         # Those might be different than input due to smoothing
-        smooth_map[smooth_map == 1] = 0
+        smooth_map[hp_map == 0] = 0.
     else:
         raise ValueError(
             "kind must be in ['Gauss', 'LogGauss'], got {}".format(kind)
