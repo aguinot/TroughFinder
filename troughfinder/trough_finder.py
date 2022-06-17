@@ -442,7 +442,7 @@ class TroughFinder():
         _, min_pix_dens, _ = hp.hotspots(self.density_map)
         amp_min_pix = self.density_map[min_pix_dens]
         mask_good_minima = (amp_min_pix < mean_dens/density_threshold) \
-            & (self.mask_map[min_pix_dens] > 1)
+            & (self.mask_map[min_pix_dens] >= 1)
 
         trough_pix_before = min_pix_dens[mask_good_minima]
         trough_region_pix = []
