@@ -104,7 +104,7 @@ def bin_map(ra, dec, nside, weights=None, method='average'):
             return Wmap
 
 
-def smooth_map(hp_map, sigma, kind='LogGauss'):
+def smooth_map(hp_map, mask_map, sigma, thresh_mask=1., kind='LogGauss'):
     """Smooth map
 
     Apply a smoothing on healpix map. At the moment can apply a simple
@@ -116,8 +116,13 @@ def smooth_map(hp_map, sigma, kind='LogGauss'):
     ----------
         hp_map: numpy.ndarray
             Healpix map.
+        mask_map: numpy.ndarray
+            Healpix map of the mask.
         sigma: float
             Sigma of the Gaussian kernel (in arcmin).
+        thresh_mask: float
+            Every pixel in hp_map which have a mask value below the threshold
+            will be masked. [Defaults: 1.]
         kind: str, optional
             Kind of smoothing to apply in ['Gauss', 'LogGauss'].
             [Defaults: 'LogGauss']
@@ -128,10 +133,6 @@ def smooth_map(hp_map, sigma, kind='LogGauss'):
         Smoothed map.
     """
 
-    # if not kind.lower() in ['gauss', 'loggauss']:
-    #     raise ValueError(
-    #         "kind must be in ['Gauss', 'LogGauss'], got {}".format(kind)
-    #     )
     if kind.lower() == 'gauss':
         smooth_map = hp.smoothing(hp_map, sigma=np.deg2rad(sigma/60))
     elif kind.lower() == 'loggauss':
@@ -141,7 +142,7 @@ def smooth_map(hp_map, sigma, kind='LogGauss'):
         smooth_map = 10**(gauss_log_map)
         # We set back masked pixels to 0
         # Those might be different than input due to smoothing
-        smooth_map[hp_map == 0] = 0.
+        smooth_map[mask_map <= thresh_mask] = 0.
     else:
         raise ValueError(
             "kind must be in ['Gauss', 'LogGauss'], got {}".format(kind)
