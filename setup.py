@@ -5,7 +5,7 @@ with open("README.md", "r") as rm:
 
 setup(
     name="troughfinder",
-    version="0.0.1",
+    version="0.0.2",
     author="Axel Guinot",
     author_email="axel.guinot.astro@gmail.com",
     description="Trough finder",
