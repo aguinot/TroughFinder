@@ -148,6 +148,7 @@ class TroughFinder():
         radius = self._arcmin_to_rad(start_step)
         direc = 1
         step = start_step
+
         while True:
             within_pix = hp.query_disc(self._nside, vec, radius)
             common_pix_frac = len(np.intersect1d(within_pix, trough_region)) \
@@ -162,7 +163,7 @@ class TroughFinder():
                     if step < min_step:
                         break
                     radius += self._arcmin_to_rad(step)
-            elif common_pix_frac <= 1:
+            elif common_pix_frac < 1:
                 if direc == 1:
                     direc = -1
                     step /= 2
@@ -207,9 +208,8 @@ class TroughFinder():
         if self._verbose:
             common_pix_frac = len(np.intersect1d(current_pix, trough_region)) \
                 / len(current_pix)
-            # print("final frac: ", common_pix_frac)
 
-        radius = np.rad2deg(radius)/60
+        radius = np.rad2deg(radius)*60
 
         return radius, within_pix
 
@@ -247,8 +247,13 @@ class TroughFinder():
             lonlat=True,
         )
         w_region = 1./self.density_map[trough_region]
-        ra_center = np.average(ra_region, weights=w_region)
-        dec_center = np.average(dec_region, weights=w_region)
+
+        ra_center, dec_center = self._get_weighted_pos(
+            ra_region,
+            dec_region,
+            w_region
+        )
+        print("ra, dec:", ra_center, dec_center)
 
         pix_center = hp.ang2pix(
             self._nside,
@@ -256,6 +261,25 @@ class TroughFinder():
             dec_center,
             lonlat=True,
         )
+
+        # Now we handle the case where the new center is not in the void region
+        # We force it to be in it otherwise it will raise errors later.
+        if pix_center not in trough_region:
+            dist = hp.rotator.angdist(
+                np.array([ra_center, dec_center]),
+                np.array([ra_region, dec_region]),
+                lonlat=True
+            )
+            ind_close = np.argmin(dist)
+            ra_center, dec_center = ra_region[ind_close], dec_region[ind_close]
+
+            pix_center = hp.ang2pix(
+                self._nside,
+                ra_center,
+                dec_center,
+                lonlat=True,
+            )
+
         vec = hp.pix2vec(self._nside, pix_center)
 
         radius, _ = self._pix_to_circle(
@@ -333,7 +357,7 @@ class TroughFinder():
                 common_pix = np.intersect1d(within_pix, trough_center_pix)
 
                 # We check if the trough found arn't already removed
-                _, already_removed, _d = np.intersect1d(
+                _, already_removed, _ = np.intersect1d(
                     common_pix,
                     removed_trough,
                     return_indices=True
@@ -420,6 +444,43 @@ class TroughFinder():
         """
         return np.deg2rad(arcmin/60)
 
+    def _get_weighted_pos(self, ra_ori, dec_ori, weights):
+        """Get weighted postions
+
+        Args:
+            pix_positions (_type_): _description_
+            weights (_type_): _description_
+        """
+
+        ra = np.copy(ra_ori)
+        dec = np.copy(dec_ori)
+
+        # Shift RA
+        ra_360 = False
+        if np.any(ra > 355) & np.any((ra > 0) & (ra < 5)):
+            mask_ra = ra > 180
+            ra[mask_ra] -= 360
+            ra_360 = True
+        else:
+            ra_mean = np.mean(ra)
+            ra -= ra_mean
+        # Shift DEC
+        dec_mean = np.mean(dec)
+        dec -= dec_mean
+
+        ra_center = np.average(ra, weights=weights)
+        dec_center = np.average(dec, weights=weights)
+
+        # Shift back RA
+        if ra_360 & (ra_center < 0):
+            ra_center += 360
+        elif not ra_360:
+            ra_center += ra_mean
+        # Shift back DEC
+        dec_center += dec_mean
+
+        return ra_center, dec_center
+
     def run(
         self,
         density_threshold=1,
@@ -437,19 +498,25 @@ class TroughFinder():
 
         # Get mean density
         mean_dens = np.average(self.density_map, weights=self.mask_map)
+        self._verboseprint("Average density:", mean_dens)
 
         # Get location of local minima and their amplitude
         _, min_pix_dens, _ = hp.hotspots(self.density_map)
+        self._verboseprint("Number of local minimas:", len(min_pix_dens))
         amp_min_pix = self.density_map[min_pix_dens]
         mask_good_minima = (amp_min_pix < mean_dens/density_threshold) \
-            & (self.mask_map[min_pix_dens] >= 1)
+            & (self.mask_map[min_pix_dens] == 1)
 
         trough_pix_before = min_pix_dens[mask_good_minima]
+        self._verboseprint(
+            "Number of local minimas considered as trough:",
+            len(trough_pix_before)
+        )
         trough_region_pix = []
+        trough_radius_before = np.array([])
         if keep_before_cleanup:
             trough_ra_before = np.array([])
             trough_dec_before = np.array([])
-            trough_radius_before = np.array([])
         for tmp_minima_pix in tqdm(
             trough_pix_before,
             total=len(trough_pix_before),
@@ -478,13 +545,19 @@ class TroughFinder():
                 lonlat=True,
             )
 
-            if keep_before_cleanup:
-                trough_ra_before = np.append(trough_ra_before, ra_tmp)
-                trough_dec_before = np.append(trough_dec_before, dec_tmp)
-                trough_radius_before = np.append(
+            trough_radius_before = np.append(
                     trough_radius_before,
                     trough_rad
                 )
+
+            if keep_before_cleanup:
+                trough_ra_before = np.append(trough_ra_before, ra_tmp)
+                trough_dec_before = np.append(trough_dec_before, dec_tmp)
+
+        self._verboseprint(
+            "Number of troughs before cleanup:",
+            len(trough_radius_before)
+        )
 
         if do_cleanup:
             (
@@ -497,6 +570,10 @@ class TroughFinder():
                 trough_radius_before,
                 trough_pix_before,
                 trough_region_pix,
+            )
+            self._verboseprint(
+                "Number of troughs after cleanup:",
+                len(trough_radius)
             )
 
         if do_cleanup & keep_before_cleanup:
